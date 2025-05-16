@@ -5,8 +5,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import random
 from collections import deque
 
-firstName = ["Alpha ", "King ", "Infinite ", "Cash ", "American ", "Eagle ", "Sigma ", "Holy ", "Patriot ", "Fresh ", "Giga ", "Super ", "Royal ", "Web3 ", "Bob's", "Uncle Joe's ", "Mommy's ", "Daddy's ", "Cyber "]
-secondName = ["Defense ", "Markets ", "Coffee ", "Burgers ", "Auto ", "Brokerage ", "Realestate ", "Banking ", "Electroncs ", "Technology ", "News ", "Food ", "Farming ", "Fishing ", "Bands ", "Crypto ", "Bitcoin ", "NFT ", "AI ", "Cybersecurity "]
+firstName = ["Alpha ", "King ", "Infinite ", "Cash ", "American ", "Eagle ", "Sigma ", "Holy ", "Patriot ", "Fresh ", "Giga ", "Super ", "Royal ", "Web3 ", "Bob's ", "Uncle Joe's ", "Mommy's ", "Daddy's ", "Cyber "]
+secondName = ["Defense ", "Markets ", "Coffee ", "Burgers ", "Auto ", "Brokerage ", "Realestate ", "Banking ", "Electroncs ", "Technology ", "News ", "Food ", "Farming ", "Fishing ", "Bands ", "Crypto ", "Bitcoin ", "NFT ", "AI ", "Cybersecurity ", "Cookie "]
 thirdName = ["Trust", "LLC", "Enterprise", ".Co", "Incorporated.", "Corp", ".Inc", "Conglomerate", "United", "Company", "Buisness", ".Ltd"]
 
 class StockGenerator:
