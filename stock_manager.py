@@ -2,7 +2,6 @@ import subprocess
 import random
 import time
 import os
-import pygame
 
 MAX_WINDOWS = 12
 MIN_WINDOWS = 8
@@ -33,19 +32,7 @@ def cleanup_windows():
             print("[-] Window closed by user or crashed.")
     STOCK_WINDOWS = alive
 
-def play_random_song():
-    MUSIC_DIR = os.path.join(os.path.dirname(__file__), "music")
-    songs = [f for f in os.listdir(MUSIC_DIR) if f.endswith((".mp3", ".wav"))]
-    song = random.choice(songs)
-    full_path = os.path.join(MUSIC_DIR, song)
-    pygame.mixer.music.load(full_path)
-    pygame.mixer.music.play()
-    print(f"[♪] Now playing: {song}")
-
 def main():
-    pygame.mixer.init()
-    play_random_song()
-
     for _ in range(MIN_WINDOWS):
         launch_window()
 
@@ -57,10 +44,6 @@ def main():
         while len(STOCK_WINDOWS) < MIN_WINDOWS:
             print("[!] Window count dropped. Respawning...")
             launch_window()
-
-        # Handle music
-        if not pygame.mixer.music.get_busy():
-            play_random_song()
 
         # Random behavior every 30 seconds
         if int(time.time()) % 30 == 0:
