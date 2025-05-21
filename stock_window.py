@@ -6,7 +6,7 @@ import random
 from collections import deque
 import datetime
 
-firstName = ["Alpha ", "King ", "Infinite ", "Cash ", "American ", "Eagle ", "Sigma ", "Holy ", "Patriot ", "Fresh ", "Giga ", "Super ", "Royal ", "Web3 ", "Bob's ", "Uncle Joe's ", "Mommy's ", "Daddy's ", "Cyber ", "Naughty ", "Enron2 "]
+firstName = ["Alpha ", "Amity ", "Trump ", "The Best ", "King ", "Infinite ", "Cash ", "American ", "Eagle ", "Sigma ", "Holy ", "Patriot ", "Fresh ", "Giga ", "Super ", "Royal ", "Web3 ", "Bob's ", "Uncle Joe's ", "Mommy's ", "Daddy's ", "Cyber ", "Naughty ", "Enron2 "]
 secondName = ["Defense ", "Markets ", "Coffee ", "Burgers ", "Auto ", "Brokerage ", "Realestate ", "Banking ", "Electroncs ", "Technology ", "News ", "Food ", "Farming ", "Fishing ", "Bands ", "Crypto ", "Bitcoin ", "NFT ", "AI ", "Cybersecurity ", "Cookie ", "Petroleum ", "Lumber ", "Security "]
 thirdName = ["Trust", "LLC", "Enterprise", "Co", "Incorporated.", "Corp", "Inc", "Conglomerate", "United", "Company", "Buisness", "Ltd", "Empire", "World Wide", "of America", "of China"]
 
