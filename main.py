@@ -8,6 +8,7 @@ from datetime import datetime
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import DJ
+import stock_manager
 
 # Placeholder price generator – replace with your actual generator
 class PriceGenerator:
@@ -188,8 +189,9 @@ class MainApp(ctk.CTk):
         musicPlayer = DJ.MusicPlayer()
         musicPlayer.set_mood("crazy")
         musicPlayer.play_random_song()
-        # Placeholder for trading action
-        print("Start Trading clicked")
+        
+        #call stock manager
+        stock_manager.main()
 
 class UserAuth(ctk.CTk):
     def __init__(self, userData):
