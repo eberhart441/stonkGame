@@ -330,10 +330,12 @@ if __name__ == "__main__":
     auth = UserAuth(userData)
     auth.mainloop()  # quit() brings us here
     auth.destroy()   # clean up
+    print("[!] Authenication completed")
 
     # If login/signup succeeded, launch main app with user info
     if auth.logged_in_user:
+        print("[!] User logged in. Running main program...")
         app = MainApp(auth.logged_in_user)
         app.mainloop()
     else:
-        print("No user authenticated. Exiting.")
+        print("[!] No authentication. Exiting...")
