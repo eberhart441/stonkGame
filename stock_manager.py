@@ -5,7 +5,7 @@ import os
 
 MAX_WINDOWS = 12
 MIN_WINDOWS = 8
-STOCK_WINDOWS = []  # List of dicts: {'proc': subprocess handle, 'launched_at': time.time()}
+STOCK_WINDOWS = []
 
 # Get the absolute path to the stock_window.py file
 STOCK_WINDOW_PATH = os.path.join(os.path.dirname(__file__), "stock_window.py")
@@ -40,7 +40,6 @@ def main():
         time.sleep(5)
         cleanup_windows()
 
-        # Auto-respawn windows if user closes them
         while len(STOCK_WINDOWS) < MIN_WINDOWS:
             print("[!] Window count dropped. Respawning...")
             launch_window()

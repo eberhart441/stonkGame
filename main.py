@@ -116,13 +116,12 @@ class MainApp(ctk.CTk):
         self.graph_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
         self.graph_frame.pack(side="right", fill="both", expand=True, padx=15, pady=15)
 
-        # Matplotlib setup
         self.fig = Figure(figsize=(6, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.fig.patch.set_facecolor("#0f0f0f")
         self.ax.set_facecolor("#0f0f0f")
 
-        # Axis styling
+        # Axis styling shit
         self.ax.set_xlabel("Time", color='gray', fontsize=14)
         self.ax.set_ylabel("Price", color='gray', fontsize=14)
         self.ax.spines["top"].set_visible(False)
@@ -131,10 +130,10 @@ class MainApp(ctk.CTk):
         self.ax.tick_params(axis='x', colors='gray', labelsize=10, rotation=45)
         self.ax.tick_params(axis='y', colors='gray', labelsize=12)
 
-        # Initial line
+        # Initial line shit
         self.line, = self.ax.plot([], [], color="#00FF00", linewidth=2)
 
-        # Canvas
+        # Canvas making
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -307,6 +306,8 @@ class UserAuth(ctk.CTk):
             self.after(1000, self.quit)
 
 if __name__ == "__main__":
+    print("[!] Game initialized")
+
     # Play calm music
     musicPlayer = DJ.MusicPlayer()
     musicPlayer.play_random_song()
@@ -315,13 +316,17 @@ if __name__ == "__main__":
     if not os.path.exists("userData.csv") or os.stat("userData.csv").st_size == 0:
         userData = pd.DataFrame(columns=['username', 'password', 'userID', 'accountMoney'])
         userData.to_csv("userData.csv", index=False)
+        print("[!] No existing user data. Creating Empty file...")
     else:
         userData = pd.read_csv("userData.csv")
         if userData.empty:
             userData = pd.DataFrame(columns=['username', 'password', 'userID', 'accountMoney'])
             userData.to_csv("userData.csv", index=False)
+        print("[!] Retreiving user data...")
+    
 
-    # Run authentication window
+    # Run authentication 
+    print("[!] Running authentication...")
     auth = UserAuth(userData)
     auth.mainloop()  # quit() brings us here
     auth.destroy()   # clean up
