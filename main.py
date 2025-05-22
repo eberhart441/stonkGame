@@ -301,7 +301,7 @@ class UserAuth(ctk.CTk):
             self.label_status.configure(text="Username already exists", text_color="orange")
         else:
             user_id = self.generate_user_id()
-            account_money = random.randint(1_000_000, 1_500_000)
+            account_money = random.randint(10_000, 10_000_000)
             new_user = pd.DataFrame(
                 [[username, password, user_id, account_money]],
                 columns=['username', 'password', 'userID', 'accountMoney']
