@@ -269,7 +269,15 @@ class UserAuth(ctk.CTk):
         self.label_status.pack(pady=(20, 10))
 
     def generate_user_id(self, length=10):
-        return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        #Makes list of random characters
+        randChars = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","0","1","2","3","4","5","6","7","8","9"]
+        #creates user_id
+        user_id = ""
+        for x in range (10):
+           user_id += (random.choice(randChars)) 
+        #returns user_id
+        return(user_id)
+
 
     def login(self):
         username = self.entry_user.get().strip()
@@ -293,7 +301,7 @@ class UserAuth(ctk.CTk):
             self.label_status.configure(text="Username already exists", text_color="orange")
         else:
             user_id = self.generate_user_id()
-            account_money = random.randint(1_000_000, 1_500_000)
+            account_money = random.randint(10_000, 10_000_000)
             new_user = pd.DataFrame(
                 [[username, password, user_id, account_money]],
                 columns=['username', 'password', 'userID', 'accountMoney']
