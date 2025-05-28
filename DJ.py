@@ -12,7 +12,7 @@ class MusicPlayer:
             crazy/
         """
         pygame.mixer.init()
-        self.base_dir = os.path.join(os.path.dirname(__file__), "music")
+        self.base_dir = os.path.join(os.path.dirname(__file__), "Resources/music")
         self.set_mood(mood)
 
     def set_mood(self, mood):
