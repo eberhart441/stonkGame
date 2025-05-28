@@ -80,6 +80,27 @@ class MainApp(ctk.CTk):
             self.processB = Process(target=self._ad_target)
             self.processB.start()
 
+        print("[!] Trading process launched.")
+        self.start_btn.configure(state="disabled", text="\u2b62 Trading in progress...")
+        self.after(CONSTANTS.MARKET_OPEN, self.end_trading_process)
+
+    def end_trading_process(self):
+        if hasattr(self, 'processA') and self.processA.is_alive():
+            self.processA.terminate()
+            self.processA.join()
+            print("[!] Trading process ended.")
+        if hasattr(self, 'processB') and self.processB.is_alive():
+            self.processB.terminate()
+            self.processB.join()
+            print("[!] Ad process ended.")
+        
+        print("[!] All processes terminated.")
+
+        # Reset the button
+        self.start_btn.configure(state="normal", text="\u2b62 Trade Now")
+        musicPlayer.set_mood("calm")
+        musicPlayer.play_random_song()
+
     def _create_sidebar(self):
         sidebar_color = "#1c1c24"
         btn_color = "#3A7CFD"
