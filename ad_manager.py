@@ -50,11 +50,5 @@ def main(stock_managerConnect=0):
             elif len(AD_WINDOWS) > CONSTANTS.MIN_AD_WINDOWS:
                 close_window()
 
-        try:
-            # send data through pipe
-            stock_managerConnect.send(len(AD_WINDOWS))
-        except Exception as e:
-            print(f"[!] Error sending data: {e}")
-
 if __name__ == "__main__":
     main()
