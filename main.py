@@ -9,15 +9,17 @@ from datetime import datetime
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import DJ
-import stock_manager
 from multiprocessing import Process, Pipe
 
 # call the stock manager class in another process
 def start_trading(stock_managerConnect):
-    musicPlayer = DJ.MusicPlayer()
-    musicPlayer.set_mood("crazy")
-    musicPlayer.play_random_song()
+    import stock_manager
     stock_manager.main(stock_managerConnect)
+
+# call the ad manager class in another process
+def start_ads():
+    import ad_manager
+    ad_manager.main()
 
 class PriceGenerator:
     def __init__(self, starting_price):
@@ -45,6 +47,10 @@ class MainApp(ctk.CTk):
         self.mainConnect, stock_managerConnect = Pipe()
         self._trading_target = start_trading
         self._trading_args = (stock_managerConnect,)
+        self._ad_target = start_ads
+
+        # var that tracks how long the game has been running
+        updateCycle = 0
 
         self._create_sidebar()
         self._create_header()
@@ -52,9 +58,16 @@ class MainApp(ctk.CTk):
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
     def launch_trading_process(self):
-        if not hasattr(self, 'process') or not self.process.is_alive():
-            self.process = Process(target=self._trading_target, args=self._trading_args)
-            self.process.start()
+        if not hasattr(self, 'processA') or not self.processA.is_alive():
+            # Play crazy music
+            musicPlayer.set_mood("crazy")
+            musicPlayer.play_random_song()
+
+            self.processA = Process(target=self._trading_target, args=self._trading_args)
+            self.processA.start()
+        if not hasattr(self, 'processB') or not self.processB.is_alive():
+            self.processB = Process(target=self._ad_target)
+            self.processB.start()
 
     def _create_sidebar(self):
         sidebar_color = "#1c1c24"
@@ -167,6 +180,13 @@ class MainApp(ctk.CTk):
         self.price_tag = None
 
     def update(self):
+        updateCycle += 1
+
+        # save user data every fixed numer of cycles
+        if updateCycle % CONSTANTS.SAVE_CYCLE == 0:
+            pass
+
+        # try to get messages from stock_manager
         if self.mainConnect.poll():
             message = self.mainConnect.recv()
             print(f"[!] Message from stock_manager. {message}!")

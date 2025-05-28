@@ -1,6 +1,7 @@
 # main.py
 UPDATE_CYCLE = 1000 # milliseconds
 TRADE_CYCLE = 90 # seconds
+SAVE_CYCLE = 60 # seconds
 
 MIN_MONEY = 100_000
 MAX_MONEY = 10_000_000
