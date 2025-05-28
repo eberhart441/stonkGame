@@ -50,7 +50,7 @@ class MainApp(ctk.CTk):
         self._ad_target = start_ads
 
         # var that tracks how long the game has been running
-        updateCycle = 0
+        self.updateCycle = 0
 
         self._create_sidebar()
         self._create_header()
@@ -180,11 +180,15 @@ class MainApp(ctk.CTk):
         self.price_tag = None
 
     def update(self):
-        updateCycle += 1
+        self.updateCycle += 1
 
         # save user data every fixed numer of cycles
-        if updateCycle % CONSTANTS.SAVE_CYCLE == 0:
-            pass
+        if self.updateCycle % CONSTANTS.SAVE_CYCLE == 0:
+            self.user_info['accountMoney'] = self.generator.prices[-1]
+            userData = pd.read_csv(CONSTANTS.USER_DATA_FILE)
+            userData.loc[userData['userID'] == self.user_info['userID'], 'accountMoney'] = self.user_info['accountMoney']
+            userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
+            print(f"[!] User data saved. New balance: ${self.user_info['accountMoney']:.2f}")
 
         # try to get messages from stock_manager
         if self.mainConnect.poll():
