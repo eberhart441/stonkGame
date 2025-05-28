@@ -42,6 +42,7 @@ class MainApp(ctk.CTk):
         self.user_info = user_info
         self.title(f"Gloomburg Terminal - {self.user_info['username']}")
         self.geometry("1000x700")
+        self.bind("<FocusIn>", lambda e: self.lower()) # to lower the window when clicked - super damn buggy but it kinda works
 
         self.generator = PriceGenerator(self.user_info['accountMoney'])
         self.price_tag = None
