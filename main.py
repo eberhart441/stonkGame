@@ -184,7 +184,7 @@ class MainApp(ctk.CTk):
 
         # save user data every fixed numer of cycles
         if self.updateCycle % CONSTANTS.SAVE_CYCLE == 0:
-            self.user_info['accountMoney'] = self.generator.prices[-1]
+            self.user_info['accountMoney'] = int(self.generator.prices[-1])
             userData = pd.read_csv(CONSTANTS.USER_DATA_FILE)
             userData.loc[userData['userID'] == self.user_info['userID'], 'accountMoney'] = self.user_info['accountMoney']
             userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
