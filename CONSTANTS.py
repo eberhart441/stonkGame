@@ -17,7 +17,7 @@ NEW_WINDOW_PROBABILITY = 0.6  # Probability of opening a new window
 
 # ad_manager.py
 MAX_AD_WINDOWS = 6
-MIN_AD_WINDOWS = 3
+MIN_AD_WINDOWS = 2
 NEW_AD_WINDOW_INTERVAL = 20  # seconds
 NEW_AD_WINDOW_PROBABILITY = 0.8  # Probability of opening a new ad window
 

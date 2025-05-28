@@ -49,7 +49,7 @@ class MainApp(ctk.CTk):
         self._create_sidebar()
         self._create_header()
         self._create_graph_panel()
-        self.after(1000, self.update)
+        self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
     def launch_trading_process(self):
         if not hasattr(self, 'process') or not self.process.is_alive():

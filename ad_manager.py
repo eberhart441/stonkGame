@@ -7,7 +7,7 @@ import CONSTANTS
 AD_WINDOWS = []
 
 # Get the absolute path to the stock_window.py file
-AD_WINDOW_PATH = os.path.join(os.path.dirname(__file__), "stock_window.py")
+AD_WINDOW_PATH = os.path.join(os.path.dirname(__file__), "ad_window.py")
 
 def launch_window():
     proc = subprocess.Popen(["python", AD_WINDOW_PATH])
