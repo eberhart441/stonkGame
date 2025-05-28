@@ -54,7 +54,15 @@ class MainApp(ctk.CTk):
 
         self._create_sidebar()
         self._create_header()
+
         self._create_graph_panel()
+        self._create_portfolio_panel()
+        self._create_trade_panel()
+        self._create_settings_panel()
+
+        self.switch_panel("Balance")  # start with the Balance panel
+
+        # start the update cycle
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
     def launch_trading_process(self):
@@ -125,7 +133,8 @@ class MainApp(ctk.CTk):
                 corner_radius=8,
                 fg_color=btn_color,
                 hover_color=btn_hover,
-                font=ctk.CTkFont(size=14)
+                font=ctk.CTkFont(size=14),
+                command=lambda n=name: self.switch_panel(n)
             )
             btn.bind("<Enter>", lambda e, b=btn: b.configure(fg_color=btn_hover))
             btn.bind("<Leave>", lambda e, b=btn: b.configure(fg_color=btn_color))
@@ -157,9 +166,26 @@ class MainApp(ctk.CTk):
         welcome_label.pack(side="left", padx=20)
         ctk.CTkFrame(self, height=2, fg_color="#44475a").pack(fill="x")
 
+    def switch_panel(self, panel_name):
+        # hide everything
+        for frame in (self.graph_frame,
+                    self.portfolio_frame,
+                    self.trade_frame,
+                    self.settings_frame):
+            frame.pack_forget()
+
+        # show the one we need
+        if panel_name == "Balance":
+            self.graph_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        elif panel_name == "Portfolio":
+            self.portfolio_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        elif panel_name == "Trade":
+            self.trade_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        elif panel_name == "Settings":
+            self.settings_frame.pack(fill="both", expand=True, padx=15, pady=15)
+
     def _create_graph_panel(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
-        self.graph_frame.pack(side="right", fill="both", expand=True, padx=15, pady=15)
 
         self.fig = Figure(figsize=(6, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
@@ -178,6 +204,18 @@ class MainApp(ctk.CTk):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
         self.price_tag = None
+
+    def _create_portfolio_panel(self):
+        self.portfolio_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
+        ctk.CTkLabel(self.portfolio_frame, text="Your holdings will go here", text_color="gray").pack(pady=20)
+
+    def _create_trade_panel(self):
+        self.trade_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
+        ctk.CTkLabel(self.trade_frame, text="Trade options will go here", text_color="gray").pack(pady=20)
+    
+    def _create_settings_panel(self):
+        self.settings_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
+        ctk.CTkLabel(self.settings_frame, text="Settings options will go here", text_color="gray").pack(pady=20)
 
     def update(self):
         self.updateCycle += 1
