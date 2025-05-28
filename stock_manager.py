@@ -31,7 +31,7 @@ def cleanup_windows():
             print("[-] Window closed by user or crashed.")
     STOCK_WINDOWS = alive
 
-def main(stock_managerConnect):
+def main(stock_managerConnect=0):
     for _ in range(CONSTANTS.MIN_WINDOWS):
         launch_window()
 
@@ -50,8 +50,11 @@ def main(stock_managerConnect):
             elif len(STOCK_WINDOWS) > CONSTANTS.MIN_WINDOWS:
                 close_window()
 
-        # send data through pipe
-        stock_managerConnect.send(len(STOCK_WINDOWS))
+        try:
+            # send data through pipe
+            stock_managerConnect.send(len(STOCK_WINDOWS))
+        except Exception as e:
+            print(f"[!] Error sending data: {e}")
 
 if __name__ == "__main__":
     main()

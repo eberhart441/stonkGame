@@ -10,10 +10,15 @@ USER_DATA_FILE = "Resources/userData.csv"
 # stock_manager.py
 MAX_WINDOWS = 12
 MIN_WINDOWS = 8
-
 NEW_WINDOW_INTERVAL = 30  # seconds
 NEW_WINDOW_PROBABILITY = 0.6  # Probability of opening a new window
 
 # stock_window.py
+
+# ad_manager.py
+MAX_AD_WINDOWS = 6
+MIN_AD_WINDOWS = 3
+NEW_AD_WINDOW_INTERVAL = 20  # seconds
+NEW_AD_WINDOW_PROBABILITY = 0.8  # Probability of opening a new ad window
 
 # DJ
