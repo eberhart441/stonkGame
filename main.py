@@ -3,22 +3,24 @@ import pandas as pd
 import os
 import random
 import string
-import CONSTANTS
 import numpy as np
 from datetime import datetime
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import DJ
 from multiprocessing import Process, Pipe
+
+# my own modulesq
+import stock_manager
+import ad_manager
+import DJ
+import CONSTANTS
 
 # call the stock manager class in another process
 def start_trading(stock_managerConnect):
-    import stock_manager
     stock_manager.main(stock_managerConnect)
 
 # call the ad manager class in another process
 def start_ads():
-    import ad_manager
     ad_manager.main()
 
 class PriceGenerator:
