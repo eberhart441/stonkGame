@@ -6,9 +6,9 @@ import random
 from collections import deque
 import datetime
 
-firstName = ["Alpha ", "Amity ", "Trump ", "The Best ", "King ", "Infinite ", "Cash ", "American ", "Eagle ", "Sigma ", "Holy ", "Patriot ", "Fresh ", "Giga ", "Super ", "Royal ", "Web3 ", "Bob's ", "Uncle Joe's ", "Mommy's ", "Daddy's ", "Cyber ", "Naughty ", "Enron2 ", "Communist ", "Socialist ", "Sketchy ", "Underground "]
+firstName = ["Alpha ", "Amity ", "Trump ", "The Best ", "King ", "Infinite ", "Cash ", "American ", "Eagle ", "Sigma ", "Holy ", "Patriot ", "Fresh ", "Giga ", "Super ", "Royal ", "Web3 ", "Bob's ", "Uncle Joe's ", "Mommy's ", "Daddy's ", "Cyber ", "Naughty ", "Enron2 ", "Communist ", "Socialist ", "Sketchy ", "Underground ", "Elon's "]
 secondName = ["Defense ", "Markets ", "Coffee ", "Burgers ", "Auto ", "Brokerage ", "Realestate ", "Banking ", "Electroncs ", "Technology ", "News ", "Food ", "Farming ", "Fishing ", "Bands ", "Crypto ", "Bitcoin ", "NFT ", "AI ", "Cybersecurity ", "Cookie ", "Petroleum ", "Lumber ", "Security ", "Rocks ", "Corn ", "Beans ", "University "]
-thirdName = ["Trust", "LLC", "Enterprise", "Co", "Incorporated.", "Corp", "Inc", "Conglomerate", "United", "Company", "Buisness", "Ltd", "Empire", "World Wide", "of America", "of China", "for sigmas", "of Russia"]
+thirdName = ["Trust", "LLC", "Enterprise", "Co", "Incorporated.", "Corp", "Inc", "Conglomerate", "United", "Company", "Buisness", "Ltd", "Empire", "World Wide", "of America", "of China", "for sigmas", "of Russia", "Union", "Credit union"]
 
 def generate_ticker_from_name(name):
     return ''.join(word[0] for word in name.split() if word[0].isalpha()).upper()

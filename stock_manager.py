@@ -2,9 +2,8 @@ import subprocess
 import random
 import time
 import os
+import CONSTANTS
 
-MAX_WINDOWS = 12
-MIN_WINDOWS = 8
 STOCK_WINDOWS = []
 
 # Get the absolute path to the stock_window.py file
@@ -32,24 +31,27 @@ def cleanup_windows():
             print("[-] Window closed by user or crashed.")
     STOCK_WINDOWS = alive
 
-def main():
-    for _ in range(MIN_WINDOWS):
+def main(stock_managerConnect):
+    for _ in range(CONSTANTS.MIN_WINDOWS):
         launch_window()
 
     while True:
-        time.sleep(5)
+        time.sleep(1)
         cleanup_windows()
 
-        while len(STOCK_WINDOWS) < MIN_WINDOWS:
+        while len(STOCK_WINDOWS) < CONSTANTS.MIN_WINDOWS:
             print("[!] Window count dropped. Respawning...")
             launch_window()
 
-        # Random behavior every 30 seconds
-        if int(time.time()) % 30 == 0:
-            if len(STOCK_WINDOWS) < MAX_WINDOWS and random.random() < 0.6:
+        # Random behavior every set amount of seconds
+        if int(time.time()) % CONSTANTS.NEW_WINDOW_INTERVAL == 0:
+            if len(STOCK_WINDOWS) < CONSTANTS.MAX_WINDOWS and random.random() < CONSTANTS.NEW_WINDOW_PROBABILITY:
                 launch_window()
-            elif len(STOCK_WINDOWS) > MIN_WINDOWS:
+            elif len(STOCK_WINDOWS) > CONSTANTS.MIN_WINDOWS:
                 close_window()
+
+        # send data through pipe
+        stock_managerConnect.send(len(STOCK_WINDOWS))
 
 if __name__ == "__main__":
     main()

@@ -3,14 +3,22 @@ import pandas as pd
 import os
 import random
 import string
+import CONSTANTS
 import numpy as np
 from datetime import datetime
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import DJ
 import stock_manager
+from multiprocessing import Process, Pipe
 
-# --- Money generator (random walk sim) ---
+# call the stock manager class in another process
+def start_trading(stock_managerConnect):
+    musicPlayer = DJ.MusicPlayer()
+    musicPlayer.set_mood("crazy")
+    musicPlayer.play_random_song()
+    stock_manager.main(stock_managerConnect)
+
 class PriceGenerator:
     def __init__(self, starting_price):
         self.prices = [starting_price]
@@ -22,7 +30,6 @@ class PriceGenerator:
         self.prices.append(new_price)
         self.timestamps.append(datetime.now())
 
-# --- Main App ---
 class MainApp(ctk.CTk):
     def __init__(self, user_info):
         super().__init__()
@@ -35,10 +42,19 @@ class MainApp(ctk.CTk):
         self.generator = PriceGenerator(self.user_info['accountMoney'])
         self.price_tag = None
 
+        self.mainConnect, stock_managerConnect = Pipe()
+        self._trading_target = start_trading
+        self._trading_args = (stock_managerConnect,)
+
         self._create_sidebar()
         self._create_header()
         self._create_graph_panel()
-        self.after(1000, self.update_graph)
+        self.after(1000, self.update)
+
+    def launch_trading_process(self):
+        if not hasattr(self, 'process') or not self.process.is_alive():
+            self.process = Process(target=self._trading_target, args=self._trading_args)
+            self.process.start()
 
     def _create_sidebar(self):
         sidebar_color = "#1c1c24"
@@ -87,8 +103,8 @@ class MainApp(ctk.CTk):
 
         nav_frame = ctk.CTkFrame(self.sidebar, fg_color=sidebar_color, corner_radius=0)
         nav_frame.pack(fill="x", padx=10)
-        icons = {"Dashboard":"\ud83d\udcca","Portfolio":"\ud83d\udcbc","Market":"\ud83d\udcc8","Settings":"\u2699\ufe0f"}
-        for name in ["Dashboard", "Portfolio", "Market", "Settings"]:
+        icons = {"Balance":"\ud83d\udcca","Portfolio":"\ud83d\udcbc","Trade":"\ud83d\udcc8","Settings":"\u2699\ufe0f"}
+        for name in ["Balance", "Portfolio", "Trade", "Settings"]:
             btn = ctk.CTkButton(
                 nav_frame,
                 text=f"{icons[name]}  {name}",
@@ -110,7 +126,7 @@ class MainApp(ctk.CTk):
             fg_color=btn_color,
             hover_color=btn_hover,
             font=ctk.CTkFont(size=14, weight="bold"),
-            command=self.start_trading
+            command=self.launch_trading_process
         )
         self.start_btn.pack(side="bottom", pady=30)
 
@@ -150,7 +166,11 @@ class MainApp(ctk.CTk):
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
         self.price_tag = None
 
-    def update_graph(self):
+    def update(self):
+        if self.mainConnect.poll():
+            message = self.mainConnect.recv()
+            print(f"[!] Message from stock_manager. {message}!")
+
         self.generator.add_next()
         y = np.array(self.generator.prices)
         x = np.array([t.strftime("%H:%M:%S") for t in self.generator.timestamps])
@@ -179,13 +199,8 @@ class MainApp(ctk.CTk):
 
         self.balance_label.configure(text=f"${y[-1]:,.2f}")
         self.canvas.draw()
-        self.after(1000, self.update_graph)
+        self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
-    def start_trading(self):
-        musicPlayer = DJ.MusicPlayer()
-        musicPlayer.set_mood("crazy")
-        musicPlayer.play_random_song()
-        stock_manager.main()
 
 class UserAuth(ctk.CTk):
     def __init__(self, userData):
@@ -281,13 +296,13 @@ class UserAuth(ctk.CTk):
             self.label_status.configure(text="Username already exists", text_color="orange")
         else:
             user_id = self.generate_user_id()
-            account_money = random.randint(10_000, 10_000_000)
+            account_money = random.randint(CONSTANTS.MIN_MONEY, CONSTANTS.MAX_MONEY)
             new_user = pd.DataFrame(
                 [[username, password, user_id, account_money]],
                 columns=['username', 'password', 'userID', 'accountMoney']
             )
             self.userData = pd.concat([self.userData, new_user], ignore_index=True)
-            self.userData.to_csv("userData.csv", index=False)
+            self.userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
             user_info = new_user.iloc[0].to_dict()
             self.logged_in_user = user_info
             self.label_status.configure(text=f"Signup successful!\nUser ID: {user_id}", text_color="green")
@@ -304,14 +319,14 @@ if __name__ == "__main__":
     musicPlayer.play_random_song()
 
     # Load or init user data
-    if not os.path.exists("userData.csv") or os.stat("userData.csv").st_size == 0:
+    if not os.path.exists(CONSTANTS.USER_DATA_FILE) or os.stat(CONSTANTS.USER_DATA_FILE).st_size == 0:
         userData = pd.DataFrame(columns=['username', 'password', 'userID', 'accountMoney'])
-        userData.to_csv("userData.csv", index=False)
+        userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
     else:
-        userData = pd.read_csv("userData.csv")
+        userData = pd.read_csv(CONSTANTS.USER_DATA_FILE)
         if userData.empty:
             userData = pd.DataFrame(columns=['username', 'password', 'userID', 'accountMoney'])
-            userData.to_csv("userData.csv", index=False)
+            userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
 
     # Authentication
     auth = UserAuth(userData)
