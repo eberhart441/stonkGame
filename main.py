@@ -9,8 +9,6 @@ from collections import deque
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from multiprocessing import Process, Pipe
-
-import tkinter as tk
 from tkinter import ttk
 
 # my own modules
@@ -80,7 +78,7 @@ class MainApp(ctk.CTk):
             self.processB.start()
 
         self.start_btn.configure(state="disabled", text="\u2b62 Trading in progress...")
-        self.after(CONSTANTS.MARKET_OPEN, self.end_trading_process)
+        self.after(CONSTANTS.MARKET_OPEN, lambda: (self.end_trading_process, stock_manager.blow_up_everything))
 
     def end_trading_process(self):
         if hasattr(self, 'processA') and self.processA.is_alive():

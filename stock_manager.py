@@ -17,6 +17,24 @@ def launch_window():
     })
     print(f"[+] Launched new stock window. Total: {len(STOCK_WINDOWS)}")
 
+# close everything and clear all data
+def blow_up_everything():
+    print("[!] Blowing up ALL stock windows and data!!!")
+    try:
+        for w in STOCK_WINDOWS:
+            try:
+                w['proc'].terminate()
+            except Exception:
+                pass
+            try:
+                w['conn'].close()
+            except Exception:
+                pass
+        STOCK_WINDOWS.clear()
+        print("[!] All stock windows terminated and data cleared.")
+    except Exception as e:
+        print(f"[!] Error during stock_manager cleanup: {e}")
+
 def cleanup_windows():
     alive = []
     for w in STOCK_WINDOWS:
