@@ -14,6 +14,10 @@ thirdName = ["Trust", "LLC", "Enterprise", "Co", "Incorporated.", "Corp", "Inc",
 def generate_ticker_from_name(name):
     return ''.join(word[0] for word in name.split() if word[0].isalpha()).upper()
 
+def run_window(conn):
+    app = stock_window(conn)
+    app.mainloop()
+
 class StockGenerator:
     def __init__(
         self,
@@ -58,11 +62,14 @@ class StockGenerator:
         return x_new
 
 class stock_window(ctk.CTk):
-    def __init__(self):
+    def __init__(self, conn=0):
         super().__init__()
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
         self.title(f"Stock Tracker – {random.randint(1000,9999)}")
+
+        # declare the connection
+        self.conn = conn
 
         # make the windows fucking bulletproof
         self.resizable(False, False)
@@ -157,6 +164,14 @@ class stock_window(ctk.CTk):
 
     def _ticker_loop(self):
         self.update_graph()
+
+        # send the latest price to the connection if it exists
+        price = self.generator.prices[-1]
+        try:
+            self.conn.send({'name': self.generator.name, 'ticker': self.generator.ticker, 'price': price})
+        except:
+            pass
+
         self.after(CONSTANTS.UPDATE_CYCLE, self._ticker_loop)
 
 if __name__ == "__main__":
