@@ -69,10 +69,19 @@ def main(stock_managerConnect = 0):
                 STOCK_WINDOWS.remove(w)
                 print(f"[-] Closed a stock window. Total: {len(STOCK_WINDOWS)}")
 
-        for w in STOCK_WINDOWS:
-            if w['conn'].poll():
-                data = w['conn'].recv()
-                w['info'].update(data)
+        # check for updates from all windows and clean up dead ones
+        for w in STOCK_WINDOWS.copy():
+            try:
+                if w['conn'].poll():
+                    data = w['conn'].recv()
+                    w['info'].update(data)
+            except (BrokenPipeError, EOFError):
+                print("[!] Detected dead pipe—cleaning up this window.")
+                try: w['proc'].terminate()
+                except: pass
+                try: w['conn'].close()
+                except: pass
+                STOCK_WINDOWS.remove(w)
 
         # collect status updates from all windows     
         status_list = [
