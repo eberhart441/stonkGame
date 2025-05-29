@@ -9,6 +9,9 @@ class ImageWindow(ctk.CTk):
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
 
+        self.resizable(False, False)
+        self.attributes("-toolwindow", True)
+
         self.base_dir = os.path.join(os.path.dirname(__file__), "Resources", "ads")
         image_path = self._get_random_image_path()
 

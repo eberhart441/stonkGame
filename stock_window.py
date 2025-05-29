@@ -64,6 +64,10 @@ class stock_window(ctk.CTk):
         ctk.set_default_color_theme("blue")
         self.title(f"Stock Tracker – {random.randint(1000,9999)}")
 
+        # make the windows fucking bulletproof
+        self.resizable(False, False)
+        self.attributes("-toolwindow", True)
+
         # Randomize size and position
         width = random.randint(400, 900)
         height = random.randint(300, 700)
