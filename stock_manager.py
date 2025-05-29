@@ -2,7 +2,8 @@
 import time, random
 import CONSTANTS
 from multiprocessing import Process, Pipe
-from stock_window import run_window    # we’ll define this next
+from stock_window import run_window
+from multiprocessing.connection import BrokenPipeError
 
 STOCK_WINDOWS = []  # each entry: {'proc', 'conn', 'info'}
 
