@@ -5,11 +5,12 @@ import random
 import string
 import numpy as np
 from datetime import datetime
+from collections import deque
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from multiprocessing import Process, Pipe
 
-# my own modulesq
+# my own modules
 import stock_manager
 import ad_manager
 import DJ
@@ -24,9 +25,9 @@ def start_ads():
     ad_manager.main()
 
 class PriceGenerator:
-    def __init__(self, starting_price):
-        self.prices = [starting_price]
-        self.timestamps = [datetime.now()]
+    def __init__(self, starting_price, maxlen=250):
+        self.prices = deque([starting_price], maxlen=maxlen)
+        self.timestamps = deque([datetime.now()], maxlen=maxlen)
 
     def add_next(self):
         last = self.prices[-1]
@@ -287,7 +288,6 @@ class MainApp(ctk.CTk):
         self.canvas.draw()
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
-
 class UserAuth(ctk.CTk):
     def __init__(self, userData):
         super().__init__()
@@ -397,7 +397,7 @@ class UserAuth(ctk.CTk):
     def generate_user_id(self, length=10):
         return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     print("[!] Game initialized")
 
     # Play calm music

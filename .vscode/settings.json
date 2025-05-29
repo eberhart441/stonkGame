@@ -1,0 +1,10 @@
+{
+    "editor.defaultFormatter": "mikoz.black-py",
+    "python.analysis.autoImportCompletions": true,
+    "[python]": {
+        "editor.defaultFormatter": "mikoz.black-py"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    }
+}
