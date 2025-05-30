@@ -60,7 +60,7 @@ class MainApp(ctk.CTk):
         self._create_header()
         self._create_graph_panel()
         self._create_portfolio_panel()
-        self._create_trade_panel()
+        self._create_market_orders_panel()
         self._create_settings_panel()
 
         self.switch_panel("Balance")  # start with the Balance panel
@@ -78,19 +78,21 @@ class MainApp(ctk.CTk):
             self.processB.start()
 
         self.start_btn.configure(state="disabled", text="\u2b62 Trading in progress...")
-        self.after(CONSTANTS.MARKET_OPEN, lambda: (self.end_trading_process, stock_manager.blow_up_everything))
+        self.after(CONSTANTS.MARKET_OPEN, self.end_trading_process)
 
     def end_trading_process(self):
-        if hasattr(self, 'processA') and self.processA.is_alive():
-            self.processA.terminate()
-            self.processA.join()
-        if hasattr(self, 'processB') and self.processB.is_alive():
-            self.processB.terminate()
-            self.processB.join()
-
-        self.start_btn.configure(state="normal", text="\u2b62 Trade Now")
-        musicPlayer.set_mood("calm")
-        musicPlayer.play_random_song()
+            stock_manager.blow_up_everything()      # tear down any stray windows
+            if hasattr(self, 'processA') and self.processA.is_alive():
+                print("[!] Terminating A process...")
+                self.processA.terminate()
+                self.processA.join()
+            if hasattr(self, 'processB') and self.processB.is_alive():
+                print("[!] Terminating B process...")
+                self.processB.terminate()
+                self.processB.join()
+            self.start_btn.configure(state="normal", text="\u2b62 Trade Now")
+            musicPlayer.set_mood("calm")
+            musicPlayer.play_random_song()
 
     def _create_sidebar(self):
         sidebar_color = "#1c1c24"
@@ -124,8 +126,8 @@ class MainApp(ctk.CTk):
 
         nav_frame = ctk.CTkFrame(self.sidebar, fg_color=sidebar_color, corner_radius=0)
         nav_frame.pack(fill="x", padx=10)
-        icons = {"Balance":"\ud83d\udcca","Portfolio":"\ud83d\udcbc","Trade":"\ud83d\udcc8","Settings":"\u2699\ufe0f"}
-        for name in ["Balance", "Portfolio", "Trade", "Settings"]:
+        icons = {"Balance":"\ud83d\udcca","Portfolio":"\ud83d\udcbc","Market Orders":"\ud83d\udcc8","Settings":"\u2699\ufe0f"}
+        for name in ["Balance", "Portfolio", "Market Orders", "Settings"]:
             btn = ctk.CTkButton(nav_frame,
                                 text=f"{icons[name]}  {name}",
                                 width=180, height=38,
@@ -161,7 +163,7 @@ class MainApp(ctk.CTk):
 
     def switch_panel(self, panel_name):
         # hide everything
-        for frame in (self.graph_frame, self.portfolio_frame, self.trade_frame, self.settings_frame):
+        for frame in (self.graph_frame, self.portfolio_frame, self.market_orders_frame, self.settings_frame):
             frame.pack_forget()
 
         # show and refresh the one we need
@@ -170,8 +172,8 @@ class MainApp(ctk.CTk):
         elif panel_name == "Portfolio":
             self.portfolio_frame.pack(fill="both", expand=True, padx=15, pady=15)
             self.update_portfolio(self.mock_portfolio_data())  # replace with your real data source
-        elif panel_name == "Trade":
-            self.trade_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        elif panel_name == "Market Orders":
+            self.market_orders_frame.pack(fill="both", expand=True, padx=15, pady=15)
         elif panel_name == "Settings":
             self.settings_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
@@ -225,9 +227,9 @@ class MainApp(ctk.CTk):
                                         font=ctk.CTkFont(size=14, weight="bold"))
         self.total_label.pack(pady=(0,10))
 
-    def _create_trade_panel(self):
-        self.trade_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
-        ctk.CTkLabel(self.trade_frame, text="Trade options will go here", text_color="gray").pack(pady=20)
+    def _create_market_orders_panel(self):
+        self.market_orders_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
+        ctk.CTkLabel(self.market_orders_frame, text="Market order options will go here", text_color="gray").pack(pady=20)
 
     def _create_settings_panel(self):
         self.settings_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
