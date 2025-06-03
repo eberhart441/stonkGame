@@ -63,6 +63,7 @@ class MainApp(ctk.CTk):
         self._create_market_orders_panel()
         self._create_settings_panel()
 
+        self.active_panel = None
         self.switch_panel("Balance")  # start with the Balance panel
 
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
@@ -85,7 +86,10 @@ class MainApp(ctk.CTk):
             if hasattr(self, 'processA') and self.processA.is_alive():
                 print("[!] Terminating A process...")
                 self.processA.terminate()
-                self.processA.join()
+                self.processA.join(timeout=5)
+                if self.processA.is_alive():
+                    print("[!] Force killing process A")
+                    self.processA.kill()
             if hasattr(self, 'processB') and self.processB.is_alive():
                 print("[!] Terminating B process...")
                 self.processB.terminate()
@@ -161,42 +165,143 @@ class MainApp(ctk.CTk):
         welcome_label.pack(side="left", padx=20)
         ctk.CTkFrame(self, height=2, fg_color="#44475a").pack(fill="x")
 
+    
     def switch_panel(self, panel_name):
-        # hide everything
         for frame in (self.graph_frame, self.portfolio_frame, self.market_orders_frame, self.settings_frame):
             frame.pack_forget()
 
         # show and refresh the one we need
         if panel_name == "Balance":
             self.graph_frame.pack(fill="both", expand=True, padx=15, pady=15)
+            # Switch to balance axis
+            self._switch_to_balance_view()
         elif panel_name == "Portfolio":
-            self.portfolio_frame.pack(fill="both", expand=True, padx=15, pady=15)
-            self.update_portfolio(self.mock_portfolio_data())  # replace with your real data source
+            self.graph_frame.pack(fill="both", expand=True, padx=15, pady=15)
+            self._switch_to_portfolio_view()
+            if self.mainConnect.poll():
+                try:
+                    status_list = self.mainConnect.recv()
+                    self.update_portfolio(status_list)
+                except Exception as e:
+                    print(f"[!] Failed to receive portfolio data: {e}")
+            else:
+                # Show "waiting for data" message
+                self.update_portfolio(None)
         elif panel_name == "Market Orders":
             self.market_orders_frame.pack(fill="both", expand=True, padx=15, pady=15)
         elif panel_name == "Settings":
             self.settings_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
+        self.active_panel = panel_name  # keep track of the active panel
+        self.title(f"Gloomburg Terminal - {self.user_info['username']} | {panel_name}")
+
     def _create_graph_panel(self):
         self.graph_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
 
+        # Create figure with separate axes for balance and portfolio
         self.fig = Figure(figsize=(6, 4), dpi=100)
-        self.ax = self.fig.add_subplot(111)
         self.fig.patch.set_facecolor("#0f0f0f")
-        self.ax.set_facecolor("#0f0f0f")
-
-        self.ax.set_xlabel("Time", color='gray', fontsize=14)
-        self.ax.set_ylabel("Price", color='gray', fontsize=14)
-        self.ax.spines["top"].set_visible(False)
-        self.ax.spines["right"].set_visible(False)
-        self.ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
-        self.ax.tick_params(axis='x', colors='gray', labelsize=10, rotation=45)
-        self.ax.tick_params(axis='y', colors='gray', labelsize=12)
-
-        self.line, = self.ax.plot([], [], color="#00FF00", linewidth=2)
+        
+        # Balance axis (line chart)
+        self.balance_ax = self.fig.add_subplot(111)
+        self.balance_ax.set_facecolor("#0f0f0f")
+        self.balance_ax.set_xlabel("Time", color='gray', fontsize=14)
+        self.balance_ax.set_ylabel("Price", color='gray', fontsize=14)
+        self.balance_ax.spines["top"].set_visible(False)
+        self.balance_ax.spines["right"].set_visible(False)
+        self.balance_ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
+        self.balance_ax.tick_params(axis='x', colors='gray', labelsize=10, rotation=45)
+        self.balance_ax.tick_params(axis='y', colors='gray', labelsize=12)
+        
+        # Initialize the line plot
+        self.line, = self.balance_ax.plot([], [], color="#00FF00", linewidth=2)
+        
+        # Portfolio axis (bar chart) - initially None, created when needed
+        self.portfolio_ax = None
+        
+        # Current active axis
+        self.ax = self.balance_ax  # Default to balance axis
+        
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
         self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
         self.price_tag = None
+
+    def _switch_to_balance_view(self):
+        """Switch the graph to show the balance line chart"""
+        # Clear the figure and recreate balance axis
+        self.fig.clear()
+        
+        self.balance_ax = self.fig.add_subplot(111)
+        self.balance_ax.set_facecolor("#0f0f0f")
+        self.balance_ax.set_xlabel("Time", color='gray', fontsize=14)
+        self.balance_ax.set_ylabel("Price", color='gray', fontsize=14)
+        self.balance_ax.spines["top"].set_visible(False)
+        self.balance_ax.spines["right"].set_visible(False)
+        self.balance_ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
+        self.balance_ax.tick_params(axis='x', colors='gray', labelsize=10, rotation=45)
+        self.balance_ax.tick_params(axis='y', colors='gray', labelsize=12)
+        
+        # Recreate the line plot
+        self.line, = self.balance_ax.plot([], [], color="#00FF00", linewidth=2)
+        self.ax = self.balance_ax
+        self.price_tag = None
+        
+        # Force an immediate update to show current data
+        self._update_balance_graph()
+        self.canvas.draw()
+
+    def _switch_to_portfolio_view(self):
+        """Switch the graph to show the portfolio bar chart"""
+        # Clear the figure and recreate portfolio axis
+        self.fig.clear()
+        
+        self.portfolio_ax = self.fig.add_subplot(111)
+        self.portfolio_ax.set_facecolor("#0f0f0f")
+        self.ax = self.portfolio_ax
+
+    def _update_balance_graph(self):
+        """Update the balance graph with current data"""
+        try:
+            y = np.array(self.generator.prices)
+            x = np.array([t.strftime("%H:%M:%S") for t in self.generator.timestamps])
+            
+            if len(y) == 0:
+                return
+                
+            # Update the line data
+            self.line.set_data(np.arange(len(x)), y)
+            
+            step = max(1, len(x)//10)
+            self.balance_ax.set_xticks(np.arange(len(x))[::step])
+            self.balance_ax.set_xticklabels(x[::step], rotation=45, ha='right')
+            
+            self.balance_ax.set_xlim(0, len(x))
+            self.balance_ax.set_ylim(min(y) * 0.95, max(y) * 1.05)
+            
+            # Update line color based on trend
+            if len(y) > 1:
+                self.line.set_color("#00FF00" if y[-1] >= y[-2] else "#FF0000")
+            else:
+                self.line.set_color("#00FF00")
+            
+            # Update title
+            self.balance_ax.set_title(f"Balance: ${y[-1]:.2f}", color='white', fontsize=14, pad=12)
+            
+            # Update price tag
+            if self.price_tag:
+                self.price_tag.remove()
+            self.price_tag = self.balance_ax.annotate(
+                f"${y[-1]:.2f}",
+                xy=(len(x)-1, y[-1]),
+                xytext=(10, 0),
+                textcoords='offset points',
+                color='white', fontsize=12,
+                ha='left', va='center',
+                bbox=dict(boxstyle="round,pad=0.2", fc="#222222", ec="#00FF00", lw=1)
+            )
+            
+        except Exception as e:
+            print(f"[!] Error updating balance graph: {e}")
 
     def _create_portfolio_panel(self):
         self.portfolio_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
@@ -236,89 +341,154 @@ class MainApp(ctk.CTk):
         ctk.CTkLabel(self.settings_frame, text="Settings options will go here", text_color="gray").pack(pady=20)
 
     def update(self):
-        self.updateCycle += 1
-
-        if self.updateCycle % CONSTANTS.SAVE_CYCLE == 0:
-            self.user_info['accountMoney'] = int(self.generator.prices[-1])
-            userData = pd.read_csv(CONSTANTS.USER_DATA_FILE)
-            userData.loc[userData['userID'] == self.user_info['userID'], 'accountMoney'] = self.user_info['accountMoney']
-            userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
-
-        if self.mainConnect.poll():
-            try:
-                status_list = self.mainConnect.recv()
-                print(f"[!] Message from stock_manager!")
-                print(f"{'Index':>5} | {'Ticker':^8} | {'Price':>10}")
-                print("-" * 30)
-                for i, info in enumerate(status_list, start=1):
-                    ticker = info.get('ticker') or "N/A"
-                    price = info.get('price')
-                    if not isinstance(price, (int, float)):
-                        price = 0.0
-                    print(f"{i:5} | {ticker:^8} | ${price:9.2f}")
-
-            except Exception as e:
-                print(f"[!] Failed to receive data: {e}")
-
+        # Always update the generator first
         self.generator.add_next()
-        y = np.array(self.generator.prices)
-        x = np.array([t.strftime("%H:%M:%S") for t in self.generator.timestamps])
+        
+        if hasattr(self, 'active_panel'):
+            if self.active_panel == "Balance":
+                self._update_balance_graph()
+                # Redraw the canvas
+                self.canvas.draw()
+                    
+            elif self.active_panel == "Portfolio":
+                # Check for incoming data from stock_manager for portfolio
+                if self.mainConnect.poll():
+                    try:
+                        status_list = self.mainConnect.recv()
+                        self.update_portfolio(status_list)
+                    except Exception as e:
+                        print(f"[!] Failed to receive portfolio data: {e}")
 
-        self.line.set_data(np.arange(len(x)), y)
-        step = max(1, len(x)//10)
-        self.ax.set_xticks(np.arange(len(x))[::step])
-        self.ax.set_xticklabels(x[::step], rotation=45, ha='right')
-        self.ax.set_xlim(0, len(x))
-        self.ax.set_ylim(min(y) * 0.95, max(y) * 1.05)
+        # Update balance label in sidebar
+        try:
+            current_balance = int(self.generator.prices[-1])
+            self.balance_label.configure(text=f"${current_balance:,}")
+            self.user_info['accountMoney'] = current_balance
+        except Exception as e:
+            print(f"[!] Error updating balance label: {e}")
 
-        self.line.set_color("#00FF00" if y[-1] >= y[-2] else "#FF0000")
-        self.ax.set_title(f"Balance: ${y[-1]:.2f}", color='white', fontsize=14, pad=12)
+        # Save accountMoney periodically
+        self.updateCycle += 1
+        if self.updateCycle % CONSTANTS.SAVE_CYCLE == 0:
+            try:
+                userData = pd.read_csv(CONSTANTS.USER_DATA_FILE)
+                userData.loc[userData['userID'] == self.user_info['userID'], 'accountMoney'] = self.user_info['accountMoney']
+                userData.to_csv(CONSTANTS.USER_DATA_FILE, index=False)
+            except Exception as e:
+                print(f"[!] Error saving user data: {e}")
 
-        if self.price_tag:
-            self.price_tag.remove()
-        self.price_tag = self.ax.annotate(
-            f"${y[-1]:.2f}",
-            xy=(len(x)-1, y[-1]),
-            xytext=(10, 0),
-            textcoords='offset points',
-            color='white', fontsize=12,
-            ha='left', va='center',
-            bbox=dict(boxstyle="round,pad=0.2", fc="#222222", ec="#00FF00", lw=1)
-        )
-
-        self.balance_label.configure(text=f"${y[-1]:,.2f}")
-        self.canvas.draw()
+        # Schedule next update
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
-    def update_portfolio(self, portfolio_dict):
-        # clear old rows
-        for row in self.tree.get_children():
-            self.tree.delete(row)
+    def update_portfolio(self, data=None):
+        if self.ax != self.portfolio_ax:
+            self._switch_to_portfolio_view()
+        
+        if not data:
+            self.portfolio_ax.clear()
+            self.portfolio_ax.set_facecolor("#0f0f0f")
+            self.portfolio_ax.text(
+                0.5, 0.5, 
+                "Waiting for portfolio data...", 
+                ha="center", va="center", 
+                color="gray", fontsize=14, 
+                transform=self.portfolio_ax.transAxes
+            )
+            self.canvas.draw()
+            return
+        
+        try:
+            # Filter out invalid data and extract valid ticker/price pairs
+            valid_data = []
+            for d in data:
+                if isinstance(d, dict):
+                    ticker = d.get('ticker', 'N/A')
+                    price = d.get('price', None)
+                    
+                    # Only include entries with valid price data
+                    if price is not None:
+                        try:
+                            # Convert to float to ensure it's numeric
+                            price_float = float(price)
+                            if not (price_float != price_float):  # Check for NaN
+                                valid_data.append({'ticker': str(ticker), 'price': price_float})
+                        except (ValueError, TypeError):
+                            print(f"[!] Invalid price for {ticker}: {price}")
+                            continue
+                    else:
+                        print(f"[!] None price for ticker: {ticker}")
+            
+            # Check if we have any valid data after filtering
+            if not valid_data:
+                self.portfolio_ax.clear()
+                self.portfolio_ax.set_facecolor("#0f0f0f")
+                self.portfolio_ax.text(
+                    0.5, 0.5, 
+                    "No valid price data", 
+                    ha="center", va="center", 
+                    color="orange", fontsize=14, 
+                    transform=self.portfolio_ax.transAxes
+                )
+                self.canvas.draw()
+                return
+            
+            # Extract validated data
+            tickers = [d['ticker'] for d in valid_data]
+            prices = [d['price'] for d in valid_data]
+            self.portfolio_ax.clear()
+            self.portfolio_ax.set_facecolor("#0f0f0f")
+            x_positions = list(range(len(tickers)))
+            
+            bars = self.portfolio_ax.bar(x_positions, prices, 
+                                    edgecolor="white", 
+                                    color="#3A7CFD",
+                                    alpha=0.8)
+            
+            self.portfolio_ax.set_xticks(x_positions)
+            self.portfolio_ax.set_xticklabels(tickers, rotation=45, ha='right')
+            
+            self.portfolio_ax.tick_params(axis='x', colors='gray', rotation=45)
+            self.portfolio_ax.tick_params(axis='y', colors='gray')
+            self.portfolio_ax.spines["top"].set_visible(False)
+            self.portfolio_ax.spines["right"].set_visible(False)
+            self.portfolio_ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
 
-        total = 0.0
-        for symbol, info in portfolio_dict.items():
-            shares   = info["shares"]
-            avg_cost = info["avg"]
-            current  = info.get("current", self.generator.prices[-1])
-            value    = shares * current
-            pnl      = value - (shares * avg_cost)
-            total   += value
-            self.tree.insert("", "end",
-                              values=(symbol, shares,
-                                      f"${avg_cost:.2f}",
-                                      f"${current:.2f}",
-                                      f"${value:.2f}",
-                                      f"${pnl:+.2f}"))
-        self.total_label.configure(text=f"Total Value: ${total:,.2f}")
+            self.portfolio_ax.set_xlabel("Ticker", color='gray', fontsize=12)
+            self.portfolio_ax.set_ylabel("Price ($)",  color='gray', fontsize=12)
+            self.portfolio_ax.set_title("Portfolio Stock Prices", color='white', fontsize=14, pad=12)
+            
+            if prices:
+                max_price = max(prices)
+                for i, (ticker, price) in enumerate(zip(tickers, prices)):
+                    self.portfolio_ax.text(i, price + (max_price * 0.01), 
+                                        f'${price:.1f}', 
+                                        ha='center', va='bottom', 
+                                        color='white', fontsize=8)
 
-    def mock_portfolio_data(self):
-        # remove this; plug in your real portfolio source
-        return {
-            "AAPL": {"shares": 10, "avg": 145.32, "current": 150.12},
-            "GOOG": {"shares":  5, "avg": 2725.50, "current": 2740.30},
-            "CASH": {"shares":  1, "avg": 0.0,     "current": self.generator.prices[-1]}
-        }
-
+            self.canvas.draw_idle()
+            self.canvas.flush_events()
+            
+        except Exception as e:
+            print(f"[!] Error updating portfolio chart: {e}")
+            print(f"[!] Raw data received: {data}")
+            import traceback
+            traceback.print_exc()
+            
+            # Show error message on chart
+            try:
+                self.portfolio_ax.clear()
+                self.portfolio_ax.set_facecolor("#0f0f0f")
+                self.portfolio_ax.text(
+                    0.5, 0.5, 
+                    f"Chart Error: {str(e)[:50]}...", 
+                    ha="center", va="center", 
+                    color="red", fontsize=12, 
+                    transform=self.portfolio_ax.transAxes
+                )
+                self.canvas.draw()
+            except:
+                pass
+ 
 class UserAuth(ctk.CTk):
     def __init__(self, userData):
         super().__init__()
@@ -407,6 +577,7 @@ class UserAuth(ctk.CTk):
 if __name__ == "__main__":
     print("[!] Game initialized")
 
+    global musicPlayer
     musicPlayer = DJ.MusicPlayer()
     musicPlayer.play_random_song()
 
