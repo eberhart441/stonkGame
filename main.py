@@ -119,21 +119,13 @@ class MainApp(ctk.CTk):
         import platform
         
         print("[!] Closing all popup windows...")
-        
-        # Platform-specific window closing
         if platform.system() == "Windows":
-            # Kill all python processes that are stock_window.py or ad_window.py
             try:
-                # Get the current process ID to avoid killing ourselves
                 current_pid = os.getpid()
-                
-                # Use taskkill to close windows by window title patterns
                 subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Stock Tracker*"], 
                              capture_output=True, shell=True)
                 subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Random Ad*"], 
                              capture_output=True, shell=True)
-                
-                # Also try to kill by process name if they're still running
                 result = subprocess.run(["wmic", "process", "where", 
                                        f"name='python.exe' and processid!={current_pid}", 
                                        "get", "processid,commandline"], 
@@ -151,9 +143,8 @@ class MainApp(ctk.CTk):
             except Exception as e:
                 print(f"[!] Error closing windows on Windows: {e}")
                 
-        else:  # Unix-like systems (Linux, macOS)
+        else: 
             try:
-                # Kill all python processes running stock_window.py or ad_window.py
                 current_pid = os.getpid()
                 
                 # Find and kill stock windows
@@ -176,7 +167,6 @@ class MainApp(ctk.CTk):
         self.is_trading_active = False
         self.available_stocks.clear()
         
-        # Update the market orders display to show no stocks available
         if self.active_panel == "Market Orders":
             self.update_market_orders_display()
             
@@ -185,7 +175,6 @@ class MainApp(ctk.CTk):
         musicPlayer.play_random_song()
 
     def sell_all_positions(self):
-        """Sell all positions at current market prices"""
         if not self.portfolio:
             return
             
@@ -202,7 +191,6 @@ class MainApp(ctk.CTk):
         print(f"[!] All positions closed. Total proceeds: ${total_proceeds:.2f}")
 
     def buy_stock(self, ticker, shares):
-        """Execute a buy order"""
         if ticker not in self.available_stocks:
             return False, "Stock not available"
         
@@ -212,7 +200,6 @@ class MainApp(ctk.CTk):
         if total_cost > self.cash_balance:
             return False, "Insufficient funds"
         
-        # Update cash balance
         self.cash_balance -= total_cost
         
         # Update portfolio
