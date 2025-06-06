@@ -175,6 +175,11 @@ class MainApp(ctk.CTk):
         
         self.is_trading_active = False
         self.available_stocks.clear()
+        
+        # Update the market orders display to show no stocks available
+        if self.active_panel == "Market Orders":
+            self.update_market_orders_display()
+            
         self.start_btn.configure(state="normal", text="\u2b62 Trade Now")
         musicPlayer.set_mood("calm")
         musicPlayer.play_random_song()
@@ -691,6 +696,7 @@ class MainApp(ctk.CTk):
                     f"{pl_pct:+.1f}%"
                 ), tags=(tag,))
                 
+                # Restore selection if this was the selected ticker
                 if ticker == selected_ticker:
                     self.portfolio_tree.selection_set(item_id)
                     self.portfolio_tree.focus(item_id)
@@ -698,6 +704,7 @@ class MainApp(ctk.CTk):
                 total_value += value
                 total_pl += pl
             else:
+                # Stock not available (market might be closed)
                 value = shares * avg_cost
                 item_id = self.portfolio_tree.insert("", "end", values=(
                     ticker,
@@ -708,6 +715,8 @@ class MainApp(ctk.CTk):
                     "N/A",
                     "N/A"
                 ))
+                
+                # Restore selection if this was the selected ticker
                 if ticker == selected_ticker:
                     self.portfolio_tree.selection_set(item_id)
                     self.portfolio_tree.focus(item_id)
@@ -724,6 +733,7 @@ class MainApp(ctk.CTk):
         )
 
     def update(self):
+        # Always update the generator first
         self.generator.add_next()
         
         # Update generator to reflect actual account value
@@ -787,7 +797,6 @@ class MainApp(ctk.CTk):
             except Exception as e:
                 print(f"[!] Error saving user data: {e}")
 
-        # Schedule next update
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
 class UserAuth(ctk.CTk):
