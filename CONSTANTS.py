@@ -2,7 +2,7 @@
 UPDATE_CYCLE = 1000 # milliseconds
 TRADE_CYCLE = 90 # seconds
 SAVE_CYCLE = 30 # seconds
-MARKET_OPEN = 90_000 # milliseconds
+MARKET_OPEN = 120_000 # milliseconds - 2 min
 
 MIN_MONEY = 1_000_000
 MAX_MONEY = 10_000_000
