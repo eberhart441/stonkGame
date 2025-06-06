@@ -92,12 +92,6 @@ def main(stock_managerConnect = 0):
             if int(time.time()) % CONSTANTS.NEW_WINDOW_INTERVAL == 0:
                 if len(STOCK_WINDOWS) < CONSTANTS.MAX_WINDOWS and random.random() < CONSTANTS.NEW_WINDOW_PROBABILITY:
                     launch_window()
-                elif len(STOCK_WINDOWS) > CONSTANTS.MIN_WINDOWS:
-                    # kill a random one
-                    w = random.choice(STOCK_WINDOWS)
-                    w['proc'].terminate()
-                    STOCK_WINDOWS.remove(w)
-                    print(f"[-] Closed a stock window. Total: {len(STOCK_WINDOWS)}")
 
             # check for updates from all windows and clean up dead ones
             for w in STOCK_WINDOWS.copy():
