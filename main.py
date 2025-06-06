@@ -400,8 +400,6 @@ class MainApp(ctk.CTk):
         self.price_tag = None
 
     def _switch_to_balance_view(self):
-        """Switch the graph to show the balance line chart"""
-        # Clear the figure and recreate balance axis
         self.fig.clear()
         
         self.balance_ax = self.fig.add_subplot(111)
@@ -432,7 +430,6 @@ class MainApp(ctk.CTk):
             if len(y) == 0:
                 return
                 
-            # Update the line data
             self.line.set_data(np.arange(len(x)), y)
             
             step = max(1, len(x)//10)
@@ -496,7 +493,6 @@ class MainApp(ctk.CTk):
             self.portfolio_tree.column(c, anchor="center", width=100)
         self.portfolio_tree.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Sell controls
         sell_frame = ctk.CTkFrame(self.portfolio_frame, fg_color="#2a2a2a")
         sell_frame.pack(fill="x", padx=10, pady=(0,10))
         
@@ -511,7 +507,6 @@ class MainApp(ctk.CTk):
         self.sell_status_label = ctk.CTkLabel(sell_frame, text="", text_color="gray")
         self.sell_status_label.pack(side="left", padx=10)
 
-        # Total footer
         self.portfolio_total_label = ctk.CTkLabel(self.portfolio_frame,
                                         text="Total Value: $0.00",
                                         font=ctk.CTkFont(size=14, weight="bold"))
@@ -576,7 +571,6 @@ class MainApp(ctk.CTk):
         ctk.CTkLabel(self.settings_frame, text="Settings options will go here", text_color="gray").pack(pady=20)
 
     def execute_buy_order(self):
-        """Execute a buy order from the market orders panel"""
         selection = self.market_tree.selection()
         if not selection:
             self.order_status_label.configure(text="Please select a stock", text_color="red")
@@ -602,7 +596,6 @@ class MainApp(ctk.CTk):
             self.order_status_label.configure(text=message, text_color="red")
 
     def execute_sell_order(self):
-        """Execute a sell order from the portfolio panel"""
         selection = self.portfolio_tree.selection()
         if not selection:
             self.sell_status_label.configure(text="Please select a position", text_color="red")
@@ -628,8 +621,6 @@ class MainApp(ctk.CTk):
             self.sell_status_label.configure(text=message, text_color="red")
 
     def update_market_orders_display(self):
-        """Update the market orders display with available stocks"""
-        # Save current selection
         selected_items = self.market_tree.selection()
         selected_ticker = None
         if selected_items:
@@ -657,8 +648,6 @@ class MainApp(ctk.CTk):
         self.cash_label.configure(text=f"Available Cash: ${self.cash_balance:,.2f}")
 
     def update_portfolio_table(self):
-        """Update the portfolio table with current holdings"""
-        # Save current selection
         selected_items = self.portfolio_tree.selection()
         selected_ticker = None
         if selected_items:
@@ -683,7 +672,6 @@ class MainApp(ctk.CTk):
                 pl = value - (shares * avg_cost)
                 pl_pct = (pl / (shares * avg_cost)) * 100
                 
-                # Color based on P/L
                 tag = "profit" if pl >= 0 else "loss"
                 
                 item_id = self.portfolio_tree.insert("", "end", values=(
@@ -715,8 +703,6 @@ class MainApp(ctk.CTk):
                     "N/A",
                     "N/A"
                 ))
-                
-                # Restore selection if this was the selected ticker
                 if ticker == selected_ticker:
                     self.portfolio_tree.selection_set(item_id)
                     self.portfolio_tree.focus(item_id)
@@ -727,7 +713,6 @@ class MainApp(ctk.CTk):
         self.portfolio_tree.tag_configure("profit", foreground="#00FF00")
         self.portfolio_tree.tag_configure("loss", foreground="#FF0000")
         
-        # Update total label
         self.portfolio_total_label.configure(
             text=f"Total Value: ${total_value:,.2f} | Total P/L: ${total_pl:+,.2f}"
         )
