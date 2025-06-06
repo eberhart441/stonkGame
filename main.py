@@ -10,6 +10,9 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from multiprocessing import Process, Pipe
 from tkinter import ttk
+import subprocess
+import sys
+import platform
 
 # my own modules
 import stock_manager
@@ -55,6 +58,12 @@ class MainApp(ctk.CTk):
         self._ad_target = start_ads
 
         self.updateCycle = 0
+        
+        # Portfolio tracking
+        self.portfolio = {}  # {ticker: {'shares': int, 'avg_cost': float}}
+        self.available_stocks = {}  # {ticker: {'name': str, 'price': float}}
+        self.cash_balance = float(self.user_info['accountMoney'])
+        self.is_trading_active = False
 
         self._create_sidebar()
         self._create_header()
@@ -74,29 +83,193 @@ class MainApp(ctk.CTk):
             musicPlayer.play_random_song()
             self.processA = Process(target=self._trading_target, args=self._trading_args)
             self.processA.start()
+            self.is_trading_active = True
         if not hasattr(self, 'processB') or not self.processB.is_alive():
             self.processB = Process(target=self._ad_target)
             self.processB.start()
 
         self.start_btn.configure(state="disabled", text="\u2b62 Trading in progress...")
+        self.trading_end_time = datetime.now().timestamp() + (CONSTANTS.MARKET_OPEN / 1000)
         self.after(CONSTANTS.MARKET_OPEN, self.end_trading_process)
 
     def end_trading_process(self):
-            stock_manager.blow_up_everything()      # tear down any stray windows
-            if hasattr(self, 'processA') and self.processA.is_alive():
-                print("[!] Terminating A process...")
-                self.processA.terminate()
-                self.processA.join(timeout=5)
-                if self.processA.is_alive():
-                    print("[!] Force killing process A")
-                    self.processA.kill()
-            if hasattr(self, 'processB') and self.processB.is_alive():
-                print("[!] Terminating B process...")
-                self.processB.terminate()
-                self.processB.join()
-            self.start_btn.configure(state="normal", text="\u2b62 Trade Now")
-            musicPlayer.set_mood("calm")
-            musicPlayer.play_random_song()
+        # Sell all positions before closing
+        self.sell_all_positions()
+        
+        # Terminate processes FIRST to stop spawning new windows
+        if hasattr(self, 'processA') and self.processA.is_alive():
+            print("[!] Terminating stock manager process...")
+            self.processA.terminate()
+            self.processA.join(timeout=2)
+            if self.processA.is_alive():
+                print("[!] Force killing stock manager process")
+                self.processA.kill()
+                
+        if hasattr(self, 'processB') and self.processB.is_alive():
+            print("[!] Terminating ad manager process...")
+            self.processB.terminate()
+            self.processB.join(timeout=2)
+            if self.processB.is_alive():
+                print("[!] Force killing ad manager process")
+                self.processB.kill()
+        
+        # Now close all windows using a more aggressive approach
+        import subprocess
+        import sys
+        import platform
+        
+        print("[!] Closing all popup windows...")
+        
+        # Platform-specific window closing
+        if platform.system() == "Windows":
+            # Kill all python processes that are stock_window.py or ad_window.py
+            try:
+                # Get the current process ID to avoid killing ourselves
+                current_pid = os.getpid()
+                
+                # Use taskkill to close windows by window title patterns
+                subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Stock Tracker*"], 
+                             capture_output=True, shell=True)
+                subprocess.run(["taskkill", "/F", "/FI", "WINDOWTITLE eq Random Ad*"], 
+                             capture_output=True, shell=True)
+                
+                # Also try to kill by process name if they're still running
+                result = subprocess.run(["wmic", "process", "where", 
+                                       f"name='python.exe' and processid!={current_pid}", 
+                                       "get", "processid,commandline"], 
+                                       capture_output=True, text=True, shell=True)
+                
+                lines = result.stdout.strip().split('\n')[1:]  # Skip header
+                for line in lines:
+                    if line and ('stock_window.py' in line or 'ad_window.py' in line):
+                        parts = line.split()
+                        if parts:
+                            pid = parts[-1]
+                            if pid.isdigit() and int(pid) != current_pid:
+                                subprocess.run(["taskkill", "/F", "/PID", pid], 
+                                             capture_output=True, shell=True)
+            except Exception as e:
+                print(f"[!] Error closing windows on Windows: {e}")
+                
+        else:  # Unix-like systems (Linux, macOS)
+            try:
+                # Kill all python processes running stock_window.py or ad_window.py
+                current_pid = os.getpid()
+                
+                # Find and kill stock windows
+                result = subprocess.run(["pgrep", "-f", "stock_window.py"], 
+                                      capture_output=True, text=True)
+                for pid in result.stdout.strip().split('\n'):
+                    if pid and pid.isdigit() and int(pid) != current_pid:
+                        subprocess.run(["kill", "-9", pid], capture_output=True)
+                
+                # Find and kill ad windows
+                result = subprocess.run(["pgrep", "-f", "ad_window.py"], 
+                                      capture_output=True, text=True)
+                for pid in result.stdout.strip().split('\n'):
+                    if pid and pid.isdigit() and int(pid) != current_pid:
+                        subprocess.run(["kill", "-9", pid], capture_output=True)
+                        
+            except Exception as e:
+                print(f"[!] Error closing windows on Unix: {e}")
+        
+        self.is_trading_active = False
+        self.available_stocks.clear()
+        self.start_btn.configure(state="normal", text="\u2b62 Trade Now")
+        musicPlayer.set_mood("calm")
+        musicPlayer.play_random_song()
+
+    def sell_all_positions(self):
+        """Sell all positions at current market prices"""
+        if not self.portfolio:
+            return
+            
+        total_proceeds = 0
+        for ticker, holding in list(self.portfolio.items()):
+            if ticker in self.available_stocks:
+                current_price = self.available_stocks[ticker]['price']
+                proceeds = holding['shares'] * current_price
+                total_proceeds += proceeds
+                print(f"[!] Auto-sold {holding['shares']} shares of {ticker} at ${current_price:.2f} for ${proceeds:.2f}")
+        
+        self.portfolio.clear()
+        self.cash_balance += total_proceeds
+        print(f"[!] All positions closed. Total proceeds: ${total_proceeds:.2f}")
+
+    def buy_stock(self, ticker, shares):
+        """Execute a buy order"""
+        if ticker not in self.available_stocks:
+            return False, "Stock not available"
+        
+        price = self.available_stocks[ticker]['price']
+        total_cost = price * shares
+        
+        if total_cost > self.cash_balance:
+            return False, "Insufficient funds"
+        
+        # Update cash balance
+        self.cash_balance -= total_cost
+        
+        # Update portfolio
+        if ticker in self.portfolio:
+            # Calculate new average cost
+            old_shares = self.portfolio[ticker]['shares']
+            old_cost = self.portfolio[ticker]['avg_cost']
+            new_shares = old_shares + shares
+            new_avg_cost = ((old_shares * old_cost) + (shares * price)) / new_shares
+            
+            self.portfolio[ticker]['shares'] = new_shares
+            self.portfolio[ticker]['avg_cost'] = new_avg_cost
+        else:
+            self.portfolio[ticker] = {
+                'shares': shares,
+                'avg_cost': price
+            }
+        
+        # Update generator to reflect new total value
+        self.update_generator_price()
+        
+        return True, f"Bought {shares} shares of {ticker} at ${price:.2f}"
+
+    def sell_stock(self, ticker, shares):
+        """Execute a sell order"""
+        if ticker not in self.portfolio:
+            return False, "You don't own this stock"
+        
+        if ticker not in self.available_stocks:
+            return False, "Cannot get current price"
+            
+        if shares > self.portfolio[ticker]['shares']:
+            return False, "Insufficient shares"
+        
+        price = self.available_stocks[ticker]['price']
+        proceeds = price * shares
+        
+        # Update cash balance
+        self.cash_balance += proceeds
+        
+        # Update portfolio
+        self.portfolio[ticker]['shares'] -= shares
+        if self.portfolio[ticker]['shares'] == 0:
+            del self.portfolio[ticker]
+        
+        # Update generator to reflect new total value
+        self.update_generator_price()
+        
+        return True, f"Sold {shares} shares of {ticker} at ${price:.2f}"
+
+    def update_generator_price(self):
+        """Update the generator price to reflect total account value"""
+        total_value = self.cash_balance
+        
+        # Add portfolio value
+        for ticker, holding in self.portfolio.items():
+            if ticker in self.available_stocks:
+                total_value += holding['shares'] * self.available_stocks[ticker]['price']
+        
+        # Update the generator's latest price
+        if len(self.generator.prices) > 0:
+            self.generator.prices[-1] = total_value
 
     def _create_sidebar(self):
         sidebar_color = "#1c1c24"
@@ -163,9 +336,16 @@ class MainApp(ctk.CTk):
                                      font=ctk.CTkFont(size=16, weight="bold"),
                                      text_color="white")
         welcome_label.pack(side="left", padx=20)
+        
+        # Add countdown timer label
+        self.countdown_label = ctk.CTkLabel(self.header,
+                                          text="",
+                                          font=ctk.CTkFont(size=16, weight="bold"),
+                                          text_color="#FF5555")
+        self.countdown_label.pack(side="right", padx=20)
+        
         ctk.CTkFrame(self, height=2, fg_color="#44475a").pack(fill="x")
 
-    
     def switch_panel(self, panel_name):
         for frame in (self.graph_frame, self.portfolio_frame, self.market_orders_frame, self.settings_frame):
             frame.pack_forget()
@@ -176,23 +356,15 @@ class MainApp(ctk.CTk):
             # Switch to balance axis
             self._switch_to_balance_view()
         elif panel_name == "Portfolio":
-            self.graph_frame.pack(fill="both", expand=True, padx=15, pady=15)
-            self._switch_to_portfolio_view()
-            if self.mainConnect.poll():
-                try:
-                    status_list = self.mainConnect.recv()
-                    self.update_portfolio(status_list)
-                except Exception as e:
-                    print(f"[!] Failed to receive portfolio data: {e}")
-            else:
-                # Show "waiting for data" message
-                self.update_portfolio(None)
+            self.portfolio_frame.pack(fill="both", expand=True, padx=15, pady=15)
+            self.update_portfolio_table()
         elif panel_name == "Market Orders":
             self.market_orders_frame.pack(fill="both", expand=True, padx=15, pady=15)
+            self.update_market_orders_display()
         elif panel_name == "Settings":
             self.settings_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
-        self.active_panel = panel_name  # keep track of the active panel
+        self.active_panel = panel_name
         self.title(f"Gloomburg Terminal - {self.user_info['username']} | {panel_name}")
 
     def _create_graph_panel(self):
@@ -206,7 +378,7 @@ class MainApp(ctk.CTk):
         self.balance_ax = self.fig.add_subplot(111)
         self.balance_ax.set_facecolor("#0f0f0f")
         self.balance_ax.set_xlabel("Time", color='gray', fontsize=14)
-        self.balance_ax.set_ylabel("Price", color='gray', fontsize=14)
+        self.balance_ax.set_ylabel("Account Value", color='gray', fontsize=14)
         self.balance_ax.spines["top"].set_visible(False)
         self.balance_ax.spines["right"].set_visible(False)
         self.balance_ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
@@ -216,10 +388,6 @@ class MainApp(ctk.CTk):
         # Initialize the line plot
         self.line, = self.balance_ax.plot([], [], color="#00FF00", linewidth=2)
         
-        # Portfolio axis (bar chart) - initially None, created when needed
-        self.portfolio_ax = None
-        
-        # Current active axis
         self.ax = self.balance_ax  # Default to balance axis
         
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
@@ -234,7 +402,7 @@ class MainApp(ctk.CTk):
         self.balance_ax = self.fig.add_subplot(111)
         self.balance_ax.set_facecolor("#0f0f0f")
         self.balance_ax.set_xlabel("Time", color='gray', fontsize=14)
-        self.balance_ax.set_ylabel("Price", color='gray', fontsize=14)
+        self.balance_ax.set_ylabel("Account Value", color='gray', fontsize=14)
         self.balance_ax.spines["top"].set_visible(False)
         self.balance_ax.spines["right"].set_visible(False)
         self.balance_ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
@@ -249,15 +417,6 @@ class MainApp(ctk.CTk):
         # Force an immediate update to show current data
         self._update_balance_graph()
         self.canvas.draw()
-
-    def _switch_to_portfolio_view(self):
-        """Switch the graph to show the portfolio bar chart"""
-        # Clear the figure and recreate portfolio axis
-        self.fig.clear()
-        
-        self.portfolio_ax = self.fig.add_subplot(111)
-        self.portfolio_ax.set_facecolor("#0f0f0f")
-        self.ax = self.portfolio_ax
 
     def _update_balance_graph(self):
         """Update the balance graph with current data"""
@@ -284,14 +443,20 @@ class MainApp(ctk.CTk):
             else:
                 self.line.set_color("#00FF00")
             
-            # Update title
-            self.balance_ax.set_title(f"Balance: ${y[-1]:.2f}", color='white', fontsize=14, pad=12)
+            # Update title with cash and total
+            portfolio_value = sum(h['shares'] * self.available_stocks.get(t, {}).get('price', 0) 
+                                for t, h in self.portfolio.items())
+            total_value = self.cash_balance + portfolio_value
+            self.balance_ax.set_title(
+                f"Total: ${total_value:,.2f} (Cash: ${self.cash_balance:,.2f}, Stocks: ${portfolio_value:,.2f})", 
+                color='white', fontsize=14, pad=12
+            )
             
             # Update price tag
             if self.price_tag:
                 self.price_tag.remove()
             self.price_tag = self.balance_ax.annotate(
-                f"${y[-1]:.2f}",
+                f"${y[-1]:,.2f}",
                 xy=(len(x)-1, y[-1]),
                 xytext=(10, 0),
                 textcoords='offset points',
@@ -316,54 +481,299 @@ class MainApp(ctk.CTk):
                         rowheight=25)
         style.map('Treeview', background=[('selected', '#3A7CFD')])
 
-        cols = ("Symbol", "Shares", "Avg Cost", "Current", "Value", "P/L")
-        self.tree = ttk.Treeview(self.portfolio_frame,
+        cols = ("Ticker", "Shares", "Avg Cost", "Current", "Value", "P/L", "P/L %")
+        self.portfolio_tree = ttk.Treeview(self.portfolio_frame,
                                  columns=cols,
                                  show="headings",
                                  selectmode="browse")
         for c in cols:
-            self.tree.heading(c, text=c)
-            self.tree.column(c, anchor="center", width=100)
-        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+            self.portfolio_tree.heading(c, text=c)
+            self.portfolio_tree.column(c, anchor="center", width=100)
+        self.portfolio_tree.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # optional total footer
-        self.total_label = ctk.CTkLabel(self.portfolio_frame,
+        # Sell controls
+        sell_frame = ctk.CTkFrame(self.portfolio_frame, fg_color="#2a2a2a")
+        sell_frame.pack(fill="x", padx=10, pady=(0,10))
+        
+        ctk.CTkLabel(sell_frame, text="Sell Shares:").pack(side="left", padx=5)
+        self.sell_shares_entry = ctk.CTkEntry(sell_frame, width=80, placeholder_text="Shares")
+        self.sell_shares_entry.pack(side="left", padx=5)
+        
+        self.sell_btn = ctk.CTkButton(sell_frame, text="Sell Selected", width=100,
+                                      command=self.execute_sell_order)
+        self.sell_btn.pack(side="left", padx=5)
+        
+        self.sell_status_label = ctk.CTkLabel(sell_frame, text="", text_color="gray")
+        self.sell_status_label.pack(side="left", padx=10)
+
+        # Total footer
+        self.portfolio_total_label = ctk.CTkLabel(self.portfolio_frame,
                                         text="Total Value: $0.00",
                                         font=ctk.CTkFont(size=14, weight="bold"))
-        self.total_label.pack(pady=(0,10))
+        self.portfolio_total_label.pack(pady=(0,10))
 
     def _create_market_orders_panel(self):
         self.market_orders_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
-        ctk.CTkLabel(self.market_orders_frame, text="Market order options will go here", text_color="gray").pack(pady=20)
+        
+        # Available stocks display
+        stocks_label = ctk.CTkLabel(self.market_orders_frame, 
+                                   text="Available Stocks", 
+                                   font=ctk.CTkFont(size=16, weight="bold"))
+        stocks_label.pack(pady=(10,5))
+        
+        # Treeview for available stocks
+        style = ttk.Style(self)
+        style.configure("Market.Treeview",
+                        background="#1f1f28",
+                        fieldbackground="#1f1f28",
+                        foreground="white",
+                        rowheight=25)
+        
+        cols = ("Ticker", "Company", "Price")
+        self.market_tree = ttk.Treeview(self.market_orders_frame,
+                                       columns=cols,
+                                       show="headings",
+                                       selectmode="browse",
+                                       style="Market.Treeview",
+                                       height=10)
+        for c in cols:
+            self.market_tree.heading(c, text=c)
+            if c == "Company":
+                self.market_tree.column(c, anchor="w", width=300)
+            else:
+                self.market_tree.column(c, anchor="center", width=100)
+        self.market_tree.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Order entry frame
+        order_frame = ctk.CTkFrame(self.market_orders_frame, fg_color="#2a2a2a")
+        order_frame.pack(fill="x", padx=10, pady=10)
+        
+        ctk.CTkLabel(order_frame, text="Buy Order:").pack(side="left", padx=5)
+        
+        self.shares_entry = ctk.CTkEntry(order_frame, width=80, placeholder_text="Shares")
+        self.shares_entry.pack(side="left", padx=5)
+        
+        self.buy_btn = ctk.CTkButton(order_frame, text="Buy Selected", width=100,
+                                     command=self.execute_buy_order)
+        self.buy_btn.pack(side="left", padx=5)
+        
+        self.order_status_label = ctk.CTkLabel(order_frame, text="", text_color="gray")
+        self.order_status_label.pack(side="left", padx=10)
+        
+        # Cash display
+        self.cash_label = ctk.CTkLabel(self.market_orders_frame, 
+                                      text=f"Available Cash: ${self.cash_balance:,.2f}",
+                                      font=ctk.CTkFont(size=14, weight="bold"))
+        self.cash_label.pack(pady=(0,10))
 
     def _create_settings_panel(self):
         self.settings_frame = ctk.CTkFrame(self, fg_color="#1f1f28", corner_radius=8)
         ctk.CTkLabel(self.settings_frame, text="Settings options will go here", text_color="gray").pack(pady=20)
 
+    def execute_buy_order(self):
+        """Execute a buy order from the market orders panel"""
+        selection = self.market_tree.selection()
+        if not selection:
+            self.order_status_label.configure(text="Please select a stock", text_color="red")
+            return
+            
+        try:
+            shares = int(self.shares_entry.get())
+            if shares <= 0:
+                raise ValueError("Shares must be positive")
+        except ValueError:
+            self.order_status_label.configure(text="Invalid share amount", text_color="red")
+            return
+        
+        item = self.market_tree.item(selection[0])
+        ticker = item['values'][0]
+        
+        success, message = self.buy_stock(ticker, shares)
+        if success:
+            self.order_status_label.configure(text=message, text_color="green")
+            self.shares_entry.delete(0, 'end')
+            self.update_market_orders_display()
+        else:
+            self.order_status_label.configure(text=message, text_color="red")
+
+    def execute_sell_order(self):
+        """Execute a sell order from the portfolio panel"""
+        selection = self.portfolio_tree.selection()
+        if not selection:
+            self.sell_status_label.configure(text="Please select a position", text_color="red")
+            return
+            
+        try:
+            shares = int(self.sell_shares_entry.get())
+            if shares <= 0:
+                raise ValueError("Shares must be positive")
+        except ValueError:
+            self.sell_status_label.configure(text="Invalid share amount", text_color="red")
+            return
+        
+        item = self.portfolio_tree.item(selection[0])
+        ticker = item['values'][0]
+        
+        success, message = self.sell_stock(ticker, shares)
+        if success:
+            self.sell_status_label.configure(text=message, text_color="green")
+            self.sell_shares_entry.delete(0, 'end')
+            self.update_portfolio_table()
+        else:
+            self.sell_status_label.configure(text=message, text_color="red")
+
+    def update_market_orders_display(self):
+        """Update the market orders display with available stocks"""
+        # Save current selection
+        selected_items = self.market_tree.selection()
+        selected_ticker = None
+        if selected_items:
+            item = self.market_tree.item(selected_items[0])
+            selected_ticker = item['values'][0] if item['values'] else None
+        
+        # Clear existing items
+        for item in self.market_tree.get_children():
+            self.market_tree.delete(item)
+        
+        # Add available stocks and restore selection
+        for ticker, info in sorted(self.available_stocks.items()):
+            item_id = self.market_tree.insert("", "end", values=(
+                ticker,
+                info['name'],
+                f"${info['price']:.2f}"
+            ))
+            
+            # Restore selection if this was the selected ticker
+            if ticker == selected_ticker:
+                self.market_tree.selection_set(item_id)
+                self.market_tree.focus(item_id)
+        
+        # Update cash label
+        self.cash_label.configure(text=f"Available Cash: ${self.cash_balance:,.2f}")
+
+    def update_portfolio_table(self):
+        """Update the portfolio table with current holdings"""
+        # Save current selection
+        selected_items = self.portfolio_tree.selection()
+        selected_ticker = None
+        if selected_items:
+            item = self.portfolio_tree.item(selected_items[0])
+            selected_ticker = item['values'][0] if item['values'] else None
+        
+        # Clear existing items
+        for item in self.portfolio_tree.get_children():
+            self.portfolio_tree.delete(item)
+        
+        total_value = 0
+        total_pl = 0
+        
+        # Add portfolio items
+        for ticker, holding in sorted(self.portfolio.items()):
+            shares = holding['shares']
+            avg_cost = holding['avg_cost']
+            
+            if ticker in self.available_stocks:
+                current_price = self.available_stocks[ticker]['price']
+                value = shares * current_price
+                pl = value - (shares * avg_cost)
+                pl_pct = (pl / (shares * avg_cost)) * 100
+                
+                # Color based on P/L
+                tag = "profit" if pl >= 0 else "loss"
+                
+                item_id = self.portfolio_tree.insert("", "end", values=(
+                    ticker,
+                    shares,
+                    f"${avg_cost:.2f}",
+                    f"${current_price:.2f}",
+                    f"${value:,.2f}",
+                    f"${pl:+,.2f}",
+                    f"{pl_pct:+.1f}%"
+                ), tags=(tag,))
+                
+                if ticker == selected_ticker:
+                    self.portfolio_tree.selection_set(item_id)
+                    self.portfolio_tree.focus(item_id)
+                
+                total_value += value
+                total_pl += pl
+            else:
+                value = shares * avg_cost
+                item_id = self.portfolio_tree.insert("", "end", values=(
+                    ticker,
+                    shares,
+                    f"${avg_cost:.2f}",
+                    "N/A",
+                    f"${value:,.2f}",
+                    "N/A",
+                    "N/A"
+                ))
+                if ticker == selected_ticker:
+                    self.portfolio_tree.selection_set(item_id)
+                    self.portfolio_tree.focus(item_id)
+                
+                total_value += value
+        
+        # Configure tags
+        self.portfolio_tree.tag_configure("profit", foreground="#00FF00")
+        self.portfolio_tree.tag_configure("loss", foreground="#FF0000")
+        
+        # Update total label
+        self.portfolio_total_label.configure(
+            text=f"Total Value: ${total_value:,.2f} | Total P/L: ${total_pl:+,.2f}"
+        )
+
     def update(self):
-        # Always update the generator first
         self.generator.add_next()
+        
+        # Update generator to reflect actual account value
+        self.update_generator_price()
+        
+        # Update countdown timer if trading is active
+        if self.is_trading_active and hasattr(self, 'trading_end_time'):
+            remaining = self.trading_end_time - datetime.now().timestamp()
+            if remaining > 0:
+                minutes = int(remaining // 60)
+                seconds = int(remaining % 60)
+                self.countdown_label.configure(text=f"⏱️ Trading ends in: {minutes:02d}:{seconds:02d}")
+            else:
+                self.countdown_label.configure(text="⏱️ Trading ending...")
+        else:
+            self.countdown_label.configure(text="")
+        
+        # Check for stock data from stock_manager
+        if self.mainConnect.poll():
+            try:
+                status_list = self.mainConnect.recv()
+                # Update available stocks
+                for stock_info in status_list:
+                    if isinstance(stock_info, dict) and stock_info.get('ticker') and stock_info.get('price'):
+                        ticker = stock_info['ticker']
+                        self.available_stocks[ticker] = {
+                            'name': stock_info.get('name', ticker),
+                            'price': float(stock_info['price'])
+                        }
+            except Exception as e:
+                print(f"[!] Failed to receive stock data: {e}")
         
         if hasattr(self, 'active_panel'):
             if self.active_panel == "Balance":
                 self._update_balance_graph()
-                # Redraw the canvas
                 self.canvas.draw()
-                    
             elif self.active_panel == "Portfolio":
-                # Check for incoming data from stock_manager for portfolio
-                if self.mainConnect.poll():
-                    try:
-                        status_list = self.mainConnect.recv()
-                        self.update_portfolio(status_list)
-                    except Exception as e:
-                        print(f"[!] Failed to receive portfolio data: {e}")
+                self.update_portfolio_table()
+            elif self.active_panel == "Market Orders":
+                self.update_market_orders_display()
 
-        # Update balance label in sidebar
+        # Update balance label in sidebar with total account value
         try:
-            current_balance = int(self.generator.prices[-1])
-            self.balance_label.configure(text=f"${current_balance:,}")
-            self.user_info['accountMoney'] = current_balance
+            total_value = self.cash_balance
+            for ticker, holding in self.portfolio.items():
+                if ticker in self.available_stocks:
+                    total_value += holding['shares'] * self.available_stocks[ticker]['price']
+            
+            self.balance_label.configure(text=f"${int(total_value):,}")
+            self.user_info['accountMoney'] = int(total_value)
         except Exception as e:
             print(f"[!] Error updating balance label: {e}")
 
@@ -380,115 +790,6 @@ class MainApp(ctk.CTk):
         # Schedule next update
         self.after(CONSTANTS.UPDATE_CYCLE, self.update)
 
-    def update_portfolio(self, data=None):
-        if self.ax != self.portfolio_ax:
-            self._switch_to_portfolio_view()
-        
-        if not data:
-            self.portfolio_ax.clear()
-            self.portfolio_ax.set_facecolor("#0f0f0f")
-            self.portfolio_ax.text(
-                0.5, 0.5, 
-                "Waiting for portfolio data...", 
-                ha="center", va="center", 
-                color="gray", fontsize=14, 
-                transform=self.portfolio_ax.transAxes
-            )
-            self.canvas.draw()
-            return
-        
-        try:
-            # Filter out invalid data and extract valid ticker/price pairs
-            valid_data = []
-            for d in data:
-                if isinstance(d, dict):
-                    ticker = d.get('ticker', 'N/A')
-                    price = d.get('price', None)
-                    
-                    # Only include entries with valid price data
-                    if price is not None:
-                        try:
-                            # Convert to float to ensure it's numeric
-                            price_float = float(price)
-                            if not (price_float != price_float):  # Check for NaN
-                                valid_data.append({'ticker': str(ticker), 'price': price_float})
-                        except (ValueError, TypeError):
-                            print(f"[!] Invalid price for {ticker}: {price}")
-                            continue
-                    else:
-                        print(f"[!] None price for ticker: {ticker}")
-            
-            # Check if we have any valid data after filtering
-            if not valid_data:
-                self.portfolio_ax.clear()
-                self.portfolio_ax.set_facecolor("#0f0f0f")
-                self.portfolio_ax.text(
-                    0.5, 0.5, 
-                    "No valid price data", 
-                    ha="center", va="center", 
-                    color="orange", fontsize=14, 
-                    transform=self.portfolio_ax.transAxes
-                )
-                self.canvas.draw()
-                return
-            
-            # Extract validated data
-            tickers = [d['ticker'] for d in valid_data]
-            prices = [d['price'] for d in valid_data]
-            self.portfolio_ax.clear()
-            self.portfolio_ax.set_facecolor("#0f0f0f")
-            x_positions = list(range(len(tickers)))
-            
-            bars = self.portfolio_ax.bar(x_positions, prices, 
-                                    edgecolor="white", 
-                                    color="#3A7CFD",
-                                    alpha=0.8)
-            
-            self.portfolio_ax.set_xticks(x_positions)
-            self.portfolio_ax.set_xticklabels(tickers, rotation=45, ha='right')
-            
-            self.portfolio_ax.tick_params(axis='x', colors='gray', rotation=45)
-            self.portfolio_ax.tick_params(axis='y', colors='gray')
-            self.portfolio_ax.spines["top"].set_visible(False)
-            self.portfolio_ax.spines["right"].set_visible(False)
-            self.portfolio_ax.grid(True, linestyle='--', linewidth=0.5, color='gray', alpha=0.3)
-
-            self.portfolio_ax.set_xlabel("Ticker", color='gray', fontsize=12)
-            self.portfolio_ax.set_ylabel("Price ($)",  color='gray', fontsize=12)
-            self.portfolio_ax.set_title("Portfolio Stock Prices", color='white', fontsize=14, pad=12)
-            
-            if prices:
-                max_price = max(prices)
-                for i, (ticker, price) in enumerate(zip(tickers, prices)):
-                    self.portfolio_ax.text(i, price + (max_price * 0.01), 
-                                        f'${price:.1f}', 
-                                        ha='center', va='bottom', 
-                                        color='white', fontsize=8)
-
-            self.canvas.draw_idle()
-            self.canvas.flush_events()
-            
-        except Exception as e:
-            print(f"[!] Error updating portfolio chart: {e}")
-            print(f"[!] Raw data received: {data}")
-            import traceback
-            traceback.print_exc()
-            
-            # Show error message on chart
-            try:
-                self.portfolio_ax.clear()
-                self.portfolio_ax.set_facecolor("#0f0f0f")
-                self.portfolio_ax.text(
-                    0.5, 0.5, 
-                    f"Chart Error: {str(e)[:50]}...", 
-                    ha="center", va="center", 
-                    color="red", fontsize=12, 
-                    transform=self.portfolio_ax.transAxes
-                )
-                self.canvas.draw()
-            except:
-                pass
- 
 class UserAuth(ctk.CTk):
     def __init__(self, userData):
         super().__init__()
